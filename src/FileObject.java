@@ -11,25 +11,11 @@ public class FileObject implements Serializable {
 	public FileObject() {}
 	
 	private static final long serialVersionUID = 4523626L;
-	
-	private String destinationDir;
-	private String sourceDir;
+
 	private String fileName;
 	private long fileSize;
 	private byte[] data;
 	
-	public String getDestinationDir() {
-		return destinationDir;
-	}
-	public void setDestinationDir(String destinationDir) {
-		this.destinationDir = destinationDir;
-	}
-	public String getSourceDir() {
-		return sourceDir;
-	}
-	public void setSourceDir(String sourceDir) {
-		this.sourceDir = sourceDir;
-	}
 	public String getFileName() {
 		return fileName;
 	}
