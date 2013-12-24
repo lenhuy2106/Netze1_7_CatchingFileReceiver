@@ -20,7 +20,7 @@ public class CatchingFileReceiver {
 	// 63000 kb size
 	private byte[] buffer = new byte[1024 * 1000 * 63];
 	
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
 		
 		CatchingFileReceiver cfr = new CatchingFileReceiver();
 		cfr.DatagramReceivingLoop();
@@ -58,6 +58,8 @@ public class CatchingFileReceiver {
 				
 				// sending response
 					// -- alternating bit protocol
+				
+				
 				InetAddress IpAddress = dataPacket.getAddress();
 				int port = dataPacket.getPort();
 				String response = "Message received.";
