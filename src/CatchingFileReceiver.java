@@ -1,14 +1,17 @@
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.zip.CRC32;
 
 public class CatchingFileReceiver {
 
@@ -16,9 +19,12 @@ public class CatchingFileReceiver {
 	private static final int TIMEOUT = 5000;
 	private DatagramSocket socket = null;
 	private FileObject fileObject = null;
+	private FileObject[] fileGather = null;
+	CRC32 crc = null;
 	
-	// 63000 kb size
-	private byte[] buffer = new byte[1024 * 1000 * 63];
+	// 63000 kb size max
+	private final double packetSize = 1024 * 1000 * 63;
+	private byte[] buffer = new byte[(int) packetSize];
 	
 	public static void main(String[] args) throws IOException {
 		
@@ -38,38 +44,76 @@ public class CatchingFileReceiver {
 			
 			while (true) {
 				DatagramPacket dataPacket = new DatagramPacket(buffer, buffer.length);
-				socket.receive(dataPacket);
-				byte[] data = dataPacket.getData();
+				crc = new CRC32();
+				FileObject fileResponse = new FileObject();
+				fileResponse.setAck(false);	
 				
-				ByteArrayInputStream bais = new ByteArrayInputStream(data);
-				ObjectInputStream ois = new ObjectInputStream(bais);
+				do {
+					
+					socket.receive(dataPacket);
+					byte[] data = dataPacket.getData();
+					
+					ByteArrayInputStream bais = new ByteArrayInputStream(data);
+					ObjectInputStream ois = new ObjectInputStream(bais);
+					
+		            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		            ObjectOutputStream oos = new ObjectOutputStream(baos);
+					
+					// Serializing
+					fileObject = (FileObject) ois.readObject();
+					
+					// serializing error handling
+//					if (fileEvent.getStatus().equalsIgnoreCase("Error")) {
+//		            System.out.println("Some issue happened while packing the data @ client side");
+//		            	System.exit(0);
+//		      		}
+					
+					
+					boolean validPacket = false;
+					
+				// -- Combine validations
+					// ACK validation
+					validPacket = (fileObject.getAck() != fileResponse.getAck());
+					
+					// -- checksum validation (whole stream!)
+					crc.update(data);
+					validPacket = (crc.getValue() == fileObject.getChecksum());
+					
+					// -- larger files: seqnum validation
+						// -- ( saving higher packets in stack ? )
+					validPacket = fileObject.getSeqnum() == curSeqnum + 1;
+					
+					if (validPacket) {	
+						// sufficient array length
+						if (fileGather == null) 
+							fileGather = new FileObject[(int) Math.ceil(fileObject.getFileSize() / packetSize)];
+						
+						// collect fileObject
+						fileGather[fileObject.getSeqnum()] = fileObject;
+						
+						// full size reached: create file with fileObject[]
+						if (fileObject.getFileSize() == fileObject.getSeqnum() * packetSize) 
+							writeFile();
+						
+						fileResponse.setAck(!fileResponse.getAck());
+					}
+					
+					// send fileResponse		
+					oos.writeObject(fileResponse);
+					byte[] responseData = baos.toByteArray();					
+					InetAddress IpAddress = dataPacket.getAddress();
+					int port = dataPacket.getPort();
+					DatagramPacket responsePacket = new DatagramPacket(responseData, 
+																		responseData.length,
+																		IpAddress,
+																		port);
+					socket.send(responsePacket);
+					System.out.println("FileResponse (ABP) sent.");
+					// Thread.sleep(3000);
+				} while (true);
 				
-				// Serializing
-				fileObject = (FileObject) ois.readObject();
 				
-				// serializing error handling
-//				if (fileEvent.getStatus().equalsIgnoreCase("Error")) {
-//	            System.out.println("Some issue happened while packing the data @ client side");
-//	            	System.exit(0);
-//	      		}
-				
-				// -- create file with FileObject
-				writeFile();
-				
-				// sending response
-					// -- alternating bit protocol
-				
-				
-				InetAddress IpAddress = dataPacket.getAddress();
-				int port = dataPacket.getPort();
-				String response = "Message received.";
-				byte[] responseData = response.getBytes();
-				DatagramPacket responsePacket = new DatagramPacket(responseData, 
-																	responseData.length,
-																	IpAddress,
-																	port);
-				socket.send(responsePacket);
-				// Thread.sleep(3000);
+
 			}
 		
 	    } catch (SocketException e) {
@@ -90,6 +134,7 @@ public class CatchingFileReceiver {
 		FileOutputStream fos = null;
 		try {
 			fos = new FileOutputStream(file);
+			// -- merge packets fileObject[]
 			fos.write(fileObject.getData());
 			fos.flush();
 			fos.close();

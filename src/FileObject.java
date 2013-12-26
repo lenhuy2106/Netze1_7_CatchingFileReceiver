@@ -14,12 +14,16 @@ public class FileObject implements Serializable {
 	private static final long serialVersionUID = 4523626L;
 	
 	// recognizing errors
-	private int seqnum; 
-	private int acknum;
+	private int seqnum; // starts at zero
+	private boolean ack;
 	private long checksum;
+	
+	// has to be set
 	CRC32 crc = null;
 
 	private String fileName;
+	
+	// incl. overhead
 	private long fileSize;
 	private byte[] data;
 	
@@ -29,11 +33,11 @@ public class FileObject implements Serializable {
 	public void setSeqnum(int seqnum) {
 		this.seqnum = seqnum;
 	}
-	public int getAcknum() {
-		return acknum;
+	public boolean getAck() {
+		return ack;
 	}
-	public void setAcknum(int acknum) {
-		this.acknum = acknum;
+	public void setAck(boolean ack) {
+		this.ack = ack;
 	}
 	public long getChecksum() {
 		return checksum;
@@ -55,12 +59,9 @@ public class FileObject implements Serializable {
 		return data;
 	}
 
-	// auto generates checksum
 	public void setData(byte[] data) {
 		this.data = data;
-		crc = new CRC32();
-		crc.update(data);
-		checksum = crc.getValue();
+
 	}
 	public static long getSerialversionuid() {
 		return serialVersionUID;
