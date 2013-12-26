@@ -16,13 +16,10 @@ public class FileObject implements Serializable {
 	// recognizing errors
 	private int seqnum; // starts at zero
 	private boolean ack;
-	private long checksum;
-	
-	// has to be set
-	CRC32 crc = null;
+	private long checksum = -1; // update at checksum = -1: reset necessary
 
 	private String fileName;
-	
+
 	// incl. overhead
 	private long fileSize;
 	private byte[] data;
@@ -42,7 +39,9 @@ public class FileObject implements Serializable {
 	public long getChecksum() {
 		return checksum;
 	}
-	
+	public void setChecksum(long checksum) {
+		this.checksum = checksum;
+	}
 	public String getFileName() {
 		return fileName;
 	}
@@ -58,7 +57,6 @@ public class FileObject implements Serializable {
 	public byte[] getData() {
 		return data;
 	}
-
 	public void setData(byte[] data) {
 		this.data = data;
 
@@ -66,5 +64,5 @@ public class FileObject implements Serializable {
 	public static long getSerialversionuid() {
 		return serialVersionUID;
 	}
-	
+
 }

@@ -1,10 +1,12 @@
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -45,11 +47,12 @@ public class CatchingFileReceiver {
 			while (true) {
 				DatagramPacket dataPacket = new DatagramPacket(buffer, buffer.length);
 				crc = new CRC32();
+				int curSeqnum = -1;
 				FileObject fileResponse = new FileObject();
-				fileResponse.setAck(false);	
+				fileResponse.setAck(false);
 				
-				do {
-					
+				// receive fileObjects
+				do {				
 					socket.receive(dataPacket);
 					byte[] data = dataPacket.getData();
 					
@@ -59,45 +62,51 @@ public class CatchingFileReceiver {
 		            ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		            ObjectOutputStream oos = new ObjectOutputStream(baos);
 					
-					// Serializing
+					// deserializing
 					fileObject = (FileObject) ois.readObject();
 					
-					// serializing error handling
+					// deserializing error handling
 //					if (fileEvent.getStatus().equalsIgnoreCase("Error")) {
 //		            System.out.println("Some issue happened while packing the data @ client side");
 //		            	System.exit(0);
-//		      		}
-					
+//		      		}			
 					
 					boolean validPacket = false;
 					
-				// -- Combine validations
 					// ACK validation
 					validPacket = (fileObject.getAck() != fileResponse.getAck());
 					
-					// -- checksum validation (whole stream!)
-					crc.update(data);
-					validPacket = (crc.getValue() == fileObject.getChecksum());
+					// checksum validation
+					long checksum = fileObject.getChecksum();
+					fileObject.setChecksum(-1);
+						// serialize whole stream with checksum-reset
+					ByteArrayOutputStream baisReset = new ByteArrayOutputStream();
+					ObjectOutputStream ooNoCheck = new ObjectOutputStream(baisReset);   
+					ooNoCheck.writeObject(fileObject);
+					byte[] dataReset = baisReset.toByteArray();
+					crc.update(dataReset);
+					validPacket = validPacket && (crc.getValue() == checksum);
 					
-					// -- larger files: seqnum validation
+					// larger files: seqnum validation
 						// -- ( saving higher packets in stack ? )
-					validPacket = fileObject.getSeqnum() == curSeqnum + 1;
+					validPacket = validPacket && (fileObject.getSeqnum() == curSeqnum + 1);
 					
-					if (validPacket) {	
+					if (validPacket) {
 						// sufficient array length
-						if (fileGather == null) 
+						if (fileGather == null)
 							fileGather = new FileObject[(int) Math.ceil(fileObject.getFileSize() / packetSize)];
-						
+		
 						// collect fileObject
 						fileGather[fileObject.getSeqnum()] = fileObject;
-						
+
 						// full size reached: create file with fileObject[]
 						if (fileObject.getFileSize() == fileObject.getSeqnum() * packetSize) 
 							writeFile();
-						
+
 						fileResponse.setAck(!fileResponse.getAck());
+						curSeqnum++;
 					}
-					
+
 					// send fileResponse		
 					oos.writeObject(fileResponse);
 					byte[] responseData = baos.toByteArray();					
@@ -112,8 +121,6 @@ public class CatchingFileReceiver {
 					// Thread.sleep(3000);
 				} while (true);
 				
-				
-
 			}
 		
 	    } catch (SocketException e) {
@@ -125,7 +132,7 @@ public class CatchingFileReceiver {
 	    	// -- print stats ?
 	    }
 	}
-	
+
 	/**
 	 * writes file according to fileObject in same dir
 	 */
