@@ -1,12 +1,10 @@
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -39,10 +37,10 @@ public class CatchingFileReceiver {
 	 * serializes incoming bytes data to file object
 	 * @throws IOException 
 	 */
-	public void DatagramReceivingLoop() throws IOException {
+	private void DatagramReceivingLoop() throws IOException {
 		try {
 			socket = new DatagramSocket(PORT);
-			socket.setSoTimeout (TIMEOUT);
+			socket.setSoTimeout(TIMEOUT);
 			
 			while (true) {
 				DatagramPacket dataPacket = new DatagramPacket(buffer, buffer.length);
@@ -54,23 +52,8 @@ public class CatchingFileReceiver {
 				// receive fileObjects
 				do {				
 					socket.receive(dataPacket);
-					byte[] data = dataPacket.getData();
-					
-					ByteArrayInputStream bais = new ByteArrayInputStream(data);
-					ObjectInputStream ois = new ObjectInputStream(bais);
-					
-		            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		            ObjectOutputStream oos = new ObjectOutputStream(baos);
-					
-					// deserializing
-					fileObject = (FileObject) ois.readObject();
-					
-					// deserializing error handling
-//					if (fileEvent.getStatus().equalsIgnoreCase("Error")) {
-//		            System.out.println("Some issue happened while packing the data @ client side");
-//		            	System.exit(0);
-//		      		}			
-					
+					byte[] data = dataPacket.getData();					
+					fileObject = deserializeData(data);						
 					boolean validPacket = false;
 					
 					// ACK validation
@@ -79,12 +62,8 @@ public class CatchingFileReceiver {
 					// checksum validation
 					long checksum = fileObject.getChecksum();
 					fileObject.setChecksum(-1);
-						// serialize whole stream with checksum-reset
-					ByteArrayOutputStream baisReset = new ByteArrayOutputStream();
-					ObjectOutputStream ooNoCheck = new ObjectOutputStream(baisReset);   
-					ooNoCheck.writeObject(fileObject);
-					byte[] dataReset = baisReset.toByteArray();
-					crc.update(dataReset);
+					byte[] checkSumReset = serializeObject(fileObject);
+					crc.update(checkSumReset);
 					validPacket = validPacket && (crc.getValue() == checksum);
 					
 					// larger files: seqnum validation
@@ -107,14 +86,13 @@ public class CatchingFileReceiver {
 						curSeqnum++;
 					}
 
-					// send fileResponse		
-					oos.writeObject(fileResponse);
-					byte[] responseData = baos.toByteArray();					
-					InetAddress IpAddress = dataPacket.getAddress();
+					// send fileResponse
+					byte[] responseData = serializeObject(fileResponse);				
+					InetAddress ipAddress = dataPacket.getAddress();
 					int port = dataPacket.getPort();
 					DatagramPacket responsePacket = new DatagramPacket(responseData, 
 																		responseData.length,
-																		IpAddress,
+																		ipAddress,
 																		port);
 					socket.send(responsePacket);
 					System.out.println("FileResponse (ABP) sent.");
@@ -131,6 +109,30 @@ public class CatchingFileReceiver {
 	    	e.printStackTrace();
 	    	// -- print stats ?
 	    }
+	}
+	
+	/**
+	 * @param fileObject
+	 * @return
+	 * @throws IOException
+	 */
+	private byte[] serializeObject(FileObject fileObject) throws IOException {
+		ByteArrayOutputStream bais = new ByteArrayOutputStream();
+		ObjectOutputStream oos = new ObjectOutputStream(bais);   
+		oos.writeObject(fileObject);
+		return bais.toByteArray();
+	}
+	
+	/**
+	 * @param data
+	 * @return
+	 * @throws IOException
+	 * @throws ClassNotFoundException
+	 */
+	private FileObject deserializeData(byte[] data) throws IOException, ClassNotFoundException {
+		ByteArrayInputStream bais = new ByteArrayInputStream(data);
+		ObjectInputStream ois = new ObjectInputStream(bais);
+		return (FileObject) ois.readObject();
 	}
 
 	/**

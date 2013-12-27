@@ -1,5 +1,4 @@
 import java.io.Serializable;
-import java.util.zip.CRC32;
 
 /**
  * @author Nhu Huy Le & Long Matthias Yan
@@ -21,7 +20,7 @@ public class FileObject implements Serializable {
 	private String fileName;
 
 	// incl. overhead
-	private long fileSize;
+	private long fileSize; // in bytes
 	private byte[] data;
 	
 	public int getSeqnum() {
