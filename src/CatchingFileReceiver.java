@@ -11,6 +11,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.Random;
 import java.util.zip.CRC32;
 
 public class CatchingFileReceiver {
@@ -48,10 +49,13 @@ public class CatchingFileReceiver {
 				int curSeqnum = -1;
 				FileObject fileResponse = new FileObject();
 				fileResponse.setAck(false);
-				
+
 				// receive fileObjects
-				do {				
+				do {
 					socket.receive(dataPacket);
+					
+					// -- simulating network issues
+						// dataPackets
 					byte[] data = dataPacket.getData();					
 					fileObject = deserializeData(data);						
 					boolean validPacket = false;
@@ -118,11 +122,11 @@ public class CatchingFileReceiver {
 	 */
 	private byte[] serializeObject(FileObject fileObject) throws IOException {
 		ByteArrayOutputStream bais = new ByteArrayOutputStream();
-		ObjectOutputStream oos = new ObjectOutputStream(bais);   
+		ObjectOutputStream oos = new ObjectOutputStream(bais);  
 		oos.writeObject(fileObject);
 		return bais.toByteArray();
 	}
-	
+
 	/**
 	 * @param data
 	 * @return
@@ -156,4 +160,33 @@ public class CatchingFileReceiver {
 	    }
 	}
 
+}
+
+// -- validating p
+class FaultyDatagramPacket {
+	// private DatagramPacket datagramPacket;
+	Random random = null;
+	int randomPos;
+	byte[] faultyData;
+	
+	public FaultyDatagramPacket(DatagramPacket datagramPacket,
+								double pBitFlip,
+								double pPacketLoss,
+								double pPacketRepeat) {
+		random  = new Random();
+		randomPos = random.nextInt(datagramPacket.getLength());
+		
+		// deep copy
+		faultyData = datagramPacket.getData().clone();
+		
+		// flip Bit
+		if (random.nextInt(100) < (pBitFlip * 100))	
+			faultyData[randomPos / 8] = (byte) (faultyData[randomPos / 8] ^ (1 << randomPos % 8));
+		
+		// -- lose packet
+		packetLoss = (int) (pPacketLoss * 100);
+		
+		// -- repeat packet
+		packetRepeat = (int) (pPacketRepeat * 100);
+	}
 }
