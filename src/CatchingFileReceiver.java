@@ -8,10 +8,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.util.Random;
 import java.util.zip.CRC32;
 
 public class CatchingFileReceiver {
@@ -30,15 +28,17 @@ public class CatchingFileReceiver {
 	public static void main(String[] args) throws IOException {
 		
 		CatchingFileReceiver cfr = new CatchingFileReceiver();
-		cfr.DatagramReceivingLoop();
+		cfr.catchingReceive(0.1, 0.05, 0.05);
 	}
 	
 	/**
-	 * listens on datagram socket
-	 * serializes incoming bytes data to file object
+	 * Listens on datagram socket and serializes incoming bytes data to file object.
+	 * @param pBitFlip 
+	 * @param pPacketLoss 
+	 * @param pPacketDuplicate 
 	 * @throws IOException 
 	 */
-	private void DatagramReceivingLoop() throws IOException {
+	private void catchingReceive(double pPacketLoss, double pPacketDuplicate, double pBitFlip) throws IOException {
 		try {
 			socket = new DatagramSocket(PORT);
 			socket.setSoTimeout(TIMEOUT);
@@ -52,22 +52,25 @@ public class CatchingFileReceiver {
 
 				// receive fileObjects
 				do {
-					socket.receive(dataPacket);
+					socket.receive(dataPacket);				
 					
-					// -- simulating network issues
-						// dataPackets
-					byte[] data = dataPacket.getData();					
-					fileObject = deserializeData(data);						
-					boolean validPacket = false;
+					// simulating network issues
+						// DatagramPacket Wrapper
+					FaultyDatagramPacket faultyDataPacket = new FaultyDatagramPacket(dataPacket,
+																							deserializeData(dataPacket.getData()),
+																							pPacketLoss,
+																							pPacketDuplicate,
+																							pBitFlip);
+					
+					fileObject = deserializeData(faultyDataPacket.getData());				
 					
 					// ACK validation
-					validPacket = (fileObject.getAck() != fileResponse.getAck());
+					boolean validPacket = (fileObject.getAck() != fileResponse.getAck());
 					
 					// checksum validation
 					long checksum = fileObject.getChecksum();
 					fileObject.setChecksum(-1);
-					byte[] checkSumReset = serializeObject(fileObject);
-					crc.update(checkSumReset);
+					crc.update(serializeObject(fileObject));
 					validPacket = validPacket && (crc.getValue() == checksum);
 					
 					// larger files: seqnum validation
@@ -92,12 +95,10 @@ public class CatchingFileReceiver {
 
 					// send fileResponse
 					byte[] responseData = serializeObject(fileResponse);				
-					InetAddress ipAddress = dataPacket.getAddress();
-					int port = dataPacket.getPort();
 					DatagramPacket responsePacket = new DatagramPacket(responseData, 
 																		responseData.length,
-																		ipAddress,
-																		port);
+																		dataPacket.getAddress(),
+																		dataPacket.getPort());
 					socket.send(responsePacket);
 					System.out.println("FileResponse (ABP) sent.");
 					// Thread.sleep(3000);
@@ -162,31 +163,3 @@ public class CatchingFileReceiver {
 
 }
 
-// -- validating p
-class FaultyDatagramPacket {
-	// private DatagramPacket datagramPacket;
-	Random random = null;
-	int randomPos;
-	byte[] faultyData;
-	
-	public FaultyDatagramPacket(DatagramPacket datagramPacket,
-								double pBitFlip,
-								double pPacketLoss,
-								double pPacketRepeat) {
-		random  = new Random();
-		randomPos = random.nextInt(datagramPacket.getLength());
-		
-		// deep copy
-		faultyData = datagramPacket.getData().clone();
-		
-		// flip Bit
-		if (random.nextInt(100) < (pBitFlip * 100))	
-			faultyData[randomPos / 8] = (byte) (faultyData[randomPos / 8] ^ (1 << randomPos % 8));
-		
-		// -- lose packet
-		packetLoss = (int) (pPacketLoss * 100);
-		
-		// -- repeat packet
-		packetRepeat = (int) (pPacketRepeat * 100);
-	}
-}
