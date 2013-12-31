@@ -13,6 +13,8 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.zip.CRC32;
 
+// created by Nhu Huy Le & Matthias Yan Long
+
 // -- pimp console outputs
 public class CatchingFileReceiver {
 
