@@ -10,7 +10,7 @@ public class FileObject implements Serializable {
 
 	public FileObject() {}
 	
-	private static final long serialVersionUID = 4523626L;
+	private static final long serialVersionUID = 4523627L; // same version ?
 	
 	// recognizing errors
 	private int seqnum; // starts at zero

@@ -26,11 +26,13 @@ class FaultyDatagramPacket {
 								double pPacketDuplicate,
 								double pBitFlip) throws IOException {
 		this.datagramPacket = datagramPacket;
+		// deep copy
+		modifiedData = datagramPacket.getData().clone();
+		
 		random  = new Random();
 		randomBit = random.nextInt(modifiedData.length  * 8);
 		
-		// deep copy
-		modifiedData = datagramPacket.getData().clone();
+
 		
 		// lose packet
 		if (random.nextInt(100) < (pPacketLoss * 100)) {
