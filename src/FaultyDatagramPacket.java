@@ -28,26 +28,25 @@ class FaultyDatagramPacket {
 		this.datagramPacket = datagramPacket;
 		// deep copy
 		modifiedData = datagramPacket.getData().clone();
-		
 		random  = new Random();
-		randomBit = random.nextInt(modifiedData.length  * 8);
-		
-
 		
 		// lose packet
-		if (random.nextInt(100) < (pPacketLoss * 100)) {
-			modifiedData = null;
+		if (random.nextInt(100) <= (pPacketLoss * 100)) {
+			byte[] empty = {0};
+			modifiedData = empty;
 		}
 		
 		// duplicate packet
-		if (random.nextInt(100) < (pPacketDuplicate * 100))	{	
+		if (random.nextInt(100) <= (pPacketDuplicate * 100)) {	
 			ByteArrayOutputStream bais = new ByteArrayOutputStream();
 			bais.write(modifiedData);
 			bais.write(modifiedData);
 			modifiedData = bais.toByteArray();
+		}
 			
 		// flip Bit
-		if (random.nextInt(100) < (pBitFlip * 100))	
+		if (random.nextInt(100) <= (pBitFlip * 100)) {
+			randomBit = random.nextInt(modifiedData.length  * 8);
 			modifiedData[(int) (randomBit / 8)] = (byte) (modifiedData[(int) (randomBit / 8)] ^ (1 << randomBit % 8));	
 		}
 	}
